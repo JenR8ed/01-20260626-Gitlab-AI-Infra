@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Self-Hosted GitLab — AI Infra Demo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;700;800&display=swap');
+
+  :root {
+    --bg: #0a0c0f;
+    --surface: #111318;
+    --surface2: #171b22;
+    --border: #1e2530;
+    --green: #3effa0;
+    --green-dim: #1a7a4a;
+    --blue: #38bdf8;
+    --yellow: #fbbf24;
+    --red: #f87171;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* GRID BACKGROUND */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(62,255,160,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(62,255,160,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 48px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .logo {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 13px;
+    color: var(--green);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo-dot {
+    width: 8px; height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  .badge {
+    font-size: 11px;
+    padding: 3px 10px;
+    border: 1px solid var(--green-dim);
+    color: var(--green);
+    border-radius: 3px;
+    background: rgba(62,255,160,0.05);
+    letter-spacing: 0.08em;
+  }
+
+  /* HERO */
+  .hero {
+    margin-bottom: 48px;
+  }
+
+  .hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(32px, 5vw, 58px);
+    font-weight: 800;
+    line-height: 1.05;
+    color: #fff;
+    margin-bottom: 16px;
+  }
+
+  .hero h1 span {
+    color: var(--green);
+  }
+
+  .hero p {
+    color: var(--muted);
+    font-size: 14px;
+    max-width: 520px;
+    line-height: 1.7;
+  }
+
+  /* STATS ROW */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+  }
+
+  .stat-val {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--green);
+    font-family: var(--font-display);
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* MAIN LAYOUT */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 20px;
+    align-items: start;
+  }
+
+  @media (max-width: 768px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+
+  /* TERMINAL */
+  .terminal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .terminal-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .term-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+
+  .term-dot.red { background: #ef4444; }
+  .term-dot.yellow { background: #f59e0b; }
+  .term-dot.green { background: #22c55e; }
+
+  .term-title {
+    margin-left: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .terminal-body {
+    padding: 20px;
+    min-height: 380px;
+    font-size: 13px;
+    line-height: 1.8;
+    overflow-y: auto;
+    max-height: 480px;
+  }
+
+  .line { display: block; }
+  .line.prompt::before { content: '$ '; color: var(--green); }
+  .line.output { color: var(--muted); }
+  .line.success { color: var(--green); }
+  .line.warn { color: var(--yellow); }
+  .line.err { color: var(--red); }
+  .line.info { color: var(--blue); }
+  .line.blank { height: 8px; }
+  .line.section {
+    color: var(--blue);
+    font-weight: 600;
+    margin-top: 4px;
+  }
+
+  .cursor {
+    display: inline-block;
+    width: 8px; height: 14px;
+    background: var(--green);
+    vertical-align: middle;
+    animation: blink 1s step-end infinite;
+    margin-left: 2px;
+  }
+
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+
+  /* PIPELINE PANEL */
+  .pipeline-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .panel-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px;
+  }
+
+  .panel-title {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 14px;
+  }
+
+  /* PIPELINE STAGES */
+  .stage {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    transition: all 0.3s;
+  }
+
+  .stage:last-child { border-bottom: none; }
+
+  .stage-icon {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+    border: 2px solid var(--border);
+    color: var(--muted);
+    transition: all 0.4s;
+  }
+
+  .stage-icon.running {
+    border-color: var(--blue);
+    color: var(--blue);
+    animation: spin-pulse 1s linear infinite;
+  }
+
+  .stage-icon.success {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(62,255,160,0.08);
+  }
+
+  .stage-icon.pending {
+    border-color: var(--border);
+    color: var(--muted);
+  }
+
+  @keyframes spin-pulse {
+    0% { transform: rotate(0deg); box-shadow: 0 0 0 0 rgba(56,189,248,0.4); }
+    50% { box-shadow: 0 0 0 4px rgba(56,189,248,0); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .stage-info { flex: 1; }
+
+  .stage-name {
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .stage-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .stage-time {
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 40px;
+    text-align: right;
+  }
+
+  .stage-time.active { color: var(--green); }
+
+  /* COST TABLE */
+  .cost-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+
+  .cost-row:last-child { border-bottom: none; }
+  .cost-row.total { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
+  .cost-label { color: var(--muted); }
+  .cost-val { color: var(--text); }
+  .cost-val.striked { text-decoration: line-through; color: var(--red); opacity: 0.7; }
+  .cost-val.free { color: var(--green); font-weight: 700; font-size: 14px; }
+
+  /* CONTROLS */
+  .controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .btn-primary {
+    background: var(--green);
+    border-color: var(--green);
+    color: #000;
+  }
+
+  .btn-primary:hover {
+    background: #5fffb5;
+    border-color: #5fffb5;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(62,255,160,0.3);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--muted);
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--green);
+    color: var(--green);
+  }
+
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+
+  /* COMMIT INFO */
+  .commit-display {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  .commit-sha { color: var(--yellow); font-weight: 600; }
+
+  /* SECTION DIVIDER */
+  .section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    padding: 32px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* SLIDE INDICATOR */
+  .slide-indicator {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .slide-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+
+  .slide-dot.active {
+    background: var(--green);
+    width: 20px;
+    border-radius: 3px;
+  }
+
+  /* DEMO PHASES */
+  .phase-indicator {
+    display: flex;
+    gap: 0;
+    margin-bottom: 20px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .phase {
+    flex: 1;
+    text-align: center;
+    padding: 8px 4px;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-right: 1px solid var(--border);
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+
+  .phase:last-child { border-right: none; }
+
+  .phase.active {
+    background: rgba(62,255,160,0.08);
+    color: var(--green);
+  }
+
+  .phase.done {
+    background: rgba(62,255,160,0.04);
+    color: var(--green-dim);
+  }
+
+  /* REGISTRY */
+  .reg-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .reg-tag {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 5px 7px;
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+    transition: all 0.3s;
+  }
+
+  .reg-tag.new {
+    border-color: var(--green-dim);
+    color: var(--green);
+    background: rgba(62,255,160,0.05);
+  }
+
+  .footer-note {
+    margin-top: 40px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    background: var(--surface);
+  }
+
+  .footer-note strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-dot"></div>
+      GitLab Self-Hosted
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <span class="badge">PROXMOX VM</span>
+      <span class="badge">16GB RAM · 8 CORES</span>
+      <span class="badge">AI INFRA MEETUP</span>
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <h1>$0/month<br><span>AI Infrastructure</span></h1>
+    <p>Self-hosted CI/CD for ML applications. Full pipeline from commit to staging — no cloud costs, no API key exposure, no rate limits.</p>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-val" id="stat-deploys">0</div>
+      <div class="stat-label">Deploys this month</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="stat-time">—</div>
+      <div class="stat-label">Commit → Staging</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val">$0</div>
+      <div class="stat-label">Monthly CI cost</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val">100%</div>
+      <div class="stat-label">Data sovereignty</div>
+    </div>
+  </div>
+
+  <!-- PHASE NAV -->
+  <div class="phase-indicator">
+    <div class="phase active" id="ph-0" onclick="jumpPhase(0)">Setup</div>
+    <div class="phase" id="ph-1" onclick="jumpPhase(1)">Commit</div>
+    <div class="phase" id="ph-2" onclick="jumpPhase(2)">Pipeline</div>
+    <div class="phase" id="ph-3" onclick="jumpPhase(3)">Registry</div>
+    <div class="phase" id="ph-4" onclick="jumpPhase(4)">Cost</div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main-grid">
+
+    <!-- LEFT: TERMINAL -->
+    <div>
+      <div class="terminal">
+        <div class="terminal-header">
+          <div class="term-dot red"></div>
+          <div class="term-dot yellow"></div>
+          <div class="term-dot green"></div>
+          <span class="term-title">ubuntu@proxmox-vm: ~/ai-list-assist</span>
+        </div>
+        <div class="terminal-body" id="termBody">
+          <span class="line output"># AI Infrastructure Meetup Demo</span>
+          <span class="line output"># Click "Run Demo" to start the live pipeline walkthrough</span>
+          <span class="line blank"></span>
+          <span class="line output">System: Ubuntu 22.04 LTS on Proxmox VM</span>
+          <span class="line output">Hardware: 16GB RAM, 8 cores, 100GB NVMe</span>
+          <span class="line blank"></span>
+          <span class="line success">✓ GitLab CE: running (port 80)</span>
+          <span class="line success">✓ GitLab Runner: online (docker executor)</span>
+          <span class="line success">✓ Container Registry: ready (port 5050)</span>
+          <span class="line blank"></span>
+          <span class="line output">Project: <span style="color:#fff">ai-list-assist</span> — FastAPI + Gemini</span>
+          <span class="line output">Purpose: product photos → eBay listings via multimodal AI</span>
+          <span class="line blank"></span>
+          <span class="cursor"></span>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn-primary" id="btnRun" onclick="startDemo()">▶ Run Demo</button>
+        <button class="btn btn-secondary" id="btnReset" onclick="resetDemo()">↺ Reset</button>
+        <div class="commit-display" id="commitInfo" style="display:none">
+          Commit <span class="commit-sha" id="commitSha"></span> pushed to <span style="color:var(--blue)">gitlab main</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: PIPELINE + COST -->
+    <div class="pipeline-panel">
+
+      <!-- PIPELINE STATUS -->
+      <div class="panel-card">
+        <div class="panel-title">Pipeline Status</div>
+
+        <div class="stage" id="s-lint">
+          <div class="stage-icon pending" id="si-lint">—</div>
+          <div class="stage-info">
+            <div class="stage-name">Lint (Ruff + Black)</div>
+            <div class="stage-sub">Code quality check</div>
+          </div>
+          <div class="stage-time" id="st-lint">—</div>
+        </div>
+
+        <div class="stage" id="s-test">
+          <div class="stage-icon pending" id="si-test">—</div>
+          <div class="stage-info">
+            <div class="stage-name">Unit Tests (pytest)</div>
+            <div class="stage-sub">85% coverage</div>
+          </div>
+          <div class="stage-time" id="st-test">—</div>
+        </div>
+
+        <div class="stage" id="s-sec">
+          <div class="stage-icon pending" id="si-sec">—</div>
+          <div class="stage-info">
+            <div class="stage-name">Security Scan</div>
+            <div class="stage-sub">Bandit analysis</div>
+          </div>
+          <div class="stage-time" id="st-sec">—</div>
+        </div>
+
+        <div class="stage" id="s-build">
+          <div class="stage-icon pending" id="si-build">—</div>
+          <div class="stage-info">
+            <div class="stage-name">Docker Build</div>
+            <div class="stage-sub">Multi-stage FastAPI</div>
+          </div>
+          <div class="stage-time" id="st-build">—</div>
+        </div>
+
+        <div class="stage" id="s-push">
+          <div class="stage-icon pending" id="si-push">—</div>
+          <div class="stage-info">
+            <div class="stage-name">Push to Registry</div>
+            <div class="stage-sub">SHA-tagged image</div>
+          </div>
+          <div class="stage-time" id="st-push">—</div>
+        </div>
+
+        <div class="stage" id="s-deploy">
+          <div class="stage-icon pending" id="si-deploy">—</div>
+          <div class="stage-info">
+            <div class="stage-name">Deploy Staging</div>
+            <div class="stage-sub">Webhook trigger</div>
+          </div>
+          <div class="stage-time" id="st-deploy">—</div>
+        </div>
+      </div>
+
+      <!-- REGISTRY TAGS -->
+      <div class="panel-card" id="registryCard">
+        <div class="panel-title">Container Registry</div>
+        <div class="reg-grid" id="regGrid">
+          <div class="reg-tag">a1b2c3d</div>
+          <div class="reg-tag">e4f5a6b</div>
+          <div class="reg-tag">c7d8e9f</div>
+          <div class="reg-tag">b2c3d4e</div>
+          <div class="reg-tag">f5a6b7c</div>
+          <div class="reg-tag">d8e9f0a</div>
+          <div class="reg-tag">1b2c3d4</div>
+          <div class="reg-tag">e5f6a7b</div>
+          <div class="reg-tag" style="color:var(--muted);font-style:italic">+7 more</div>
+        </div>
+      </div>
+
+      <!-- COST -->
+      <div class="panel-card">
+        <div class="panel-title">Monthly Cost</div>
+        <div class="cost-row">
+          <span class="cost-label">GitHub Actions 1000min</span>
+          <span class="cost-val striked">$8</span>
+        </div>
+        <div class="cost-row">
+          <span class="cost-label">GCP Registry 50GB</span>
+          <span class="cost-val striked">$5</span>
+        </div>
+        <div class="cost-row">
+          <span class="cost-label">Managed GitLab</span>
+          <span class="cost-val striked">$29</span>
+        </div>
+        <div class="cost-row total">
+          <span class="cost-label" style="color:var(--text);font-weight:600">Self-Hosted Total</span>
+          <span class="cost-val free">$0</span>
+        </div>
+        <div style="margin-top:10px;font-size:10px;color:var(--muted)">
+          Hardware one-time: $400 · ROI: ~10 months
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="footer-note">
+    <strong>API keys never leave your infrastructure.</strong> All secrets stored in GitLab encrypted variable store, behind firewall + VPN-only access. 30–40 deploys/month across 3 projects.
+  </div>
+
+</div>
+
+<script>
+  let demoRunning = false;
+  let currentPhase = 0;
+
+  const lines = {
+    setup: [
+      { t: 'prompt', txt: 'docker ps | grep gitlab' },
+      { t: 'success', txt: 'gitlab         Up 2 days   0.0.0.0:80->80/tcp' },
+      { t: 'success', txt: 'gitlab-runner  Up 2 days' },
+      { t: 'blank' },
+      { t: 'prompt', txt: 'docker exec -it gitlab-runner gitlab-runner verify' },
+      { t: 'success', txt: 'Verifying runner... is alive' },
+      { t: 'blank' },
+    ],
+    commit: [
+      { t: 'section', txt: '── PHASE 2: Making code change ──────────────' },
+      { t: 'blank' },
+      { t: 'prompt', txt: 'echo "# Demo: AI Infra Meetup - March 2026" >> app/main.py' },
+      { t: 'blank' },
+      { t: 'prompt', txt: 'git add app/main.py' },
+      { t: 'prompt', txt: 'git commit -m "feat: improve image processing"' },
+      { t: 'success', txt: '[main abc1234] feat: improve image processing' },
+      { t: 'output', txt: ' 1 file changed, 1 insertion(+)' },
+      { t: 'blank' },
+      { t: 'prompt', txt: 'git push gitlab main' },
+      { t: 'output', txt: 'Enumerating objects: 5, done.' },
+      { t: 'success', txt: 'To http://gitlab.local/root/ai-list-assist.git' },
+      { t: 'success', txt: '   f0a1b2c..abc1234  main -> main' },
+      { t: 'blank' },
+    ],
+    pipeline: [
+      { t: 'section', txt: '── PHASE 3: Pipeline triggered ──────────────' },
+      { t: 'blank' },
+      { t: 'info', txt: '▸ STAGE: test' },
+      { t: 'output', txt: '  Running lint job on docker executor...' },
+      { t: 'output', txt: '  $ pip install ruff black (cached)' },
+      { t: 'output', txt: '  $ ruff check .' },
+      { t: 'success', txt: '  All checks passed. ✓ (15s)' },
+      { t: 'blank' },
+      { t: 'output', txt: '  Running unit-tests job...' },
+      { t: 'output', txt: '  $ pytest tests/ --cov=app --cov-report=term' },
+      { t: 'success', txt: '  17 passed, 0 failed — coverage: 85% ✓ (30s)' },
+      { t: 'blank' },
+      { t: 'output', txt: '  Running security-scan job...' },
+      { t: 'output', txt: '  $ bandit -r app/' },
+      { t: 'success', txt: '  No issues found ✓ (20s)' },
+      { t: 'blank' },
+    ],
+    build: [
+      { t: 'info', txt: '▸ STAGE: build' },
+      { t: 'output', txt: '  Running build-docker job (docker:dind)...' },
+      { t: 'output', txt: '  $ docker build -t registry.local:5050/ai-list-assist:abc1234 .' },
+      { t: 'output', txt: '  Step 1/9 : FROM python:3.11-slim AS builder' },
+      { t: 'output', txt: '  Step 5/9 : RUN pip install --no-cache-dir -r requirements.txt' },
+      { t: 'output', txt: '  Step 9/9 : CMD ["uvicorn", "app.main:app"]' },
+      { t: 'success', txt: '  Build complete: 487MB ✓ (2m 10s)' },
+      { t: 'blank' },
+      { t: 'output', txt: '  $ docker push registry.local:5050/ai-list-assist:abc1234' },
+      { t: 'success', txt: '  abc1234: digest: sha256:3ef... pushed ✓ (25s)' },
+      { t: 'blank' },
+    ],
+    deploy: [
+      { t: 'info', txt: '▸ STAGE: deploy' },
+      { t: 'output', txt: '  Running deploy-staging job...' },
+      { t: 'output', txt: '  $ curl -X POST $DEPLOY_WEBHOOK_URL' },
+      { t: 'success', txt: '  Staging deployment triggered ✓' },
+      { t: 'blank' },
+      { t: 'success', txt: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━' },
+      { t: 'success', txt: '  Pipeline #42 PASSED in 4m 02s' },
+      { t: 'success', txt: '  commit abc1234 → staging.local ✓' },
+      { t: 'success', txt: '  API keys: stored in GitLab vars, never exposed' },
+      { t: 'success', txt: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━' },
+      { t: 'blank' },
+    ]
+  };
+
+  async function typeLines(lineArr, termBody) {
+    for (const l of lineArr) {
+      const span = document.createElement('span');
+      if (l.t === 'blank') {
+        span.className = 'line blank';
+      } else {
+        span.className = `line ${l.t}`;
+        span.textContent = l.txt;
+        if (l.t === 'prompt') span.classList.add('prompt');
+      }
+      // remove cursor, add line, re-add cursor
+      const cur = termBody.querySelector('.cursor');
+      if (cur) cur.remove();
+      termBody.appendChild(span);
+      const newCur = document.createElement('span');
+      newCur.className = 'cursor';
+      termBody.appendChild(newCur);
+      termBody.scrollTop = termBody.scrollHeight;
+      await delay(l.t === 'blank' ? 80 : l.t === 'prompt' ? 300 : 150);
+    }
+  }
+
+  function delay(ms) {
+    return new Promise(r => setTimeout(r, ms));
+  }
+
+  function setPhase(n) {
+    for (let i = 0; i < 5; i++) {
+      const el = document.getElementById(`ph-${i}`);
+      el.className = 'phase' + (i < n ? ' done' : i === n ? ' active' : '');
+    }
+    currentPhase = n;
+  }
+
+  function setStage(id, state, time) {
+    const icon = document.getElementById(`si-${id}`);
+    const timeEl = document.getElementById(`st-${id}`);
+    icon.className = `stage-icon ${state}`;
+    if (state === 'running') { icon.textContent = '↻'; timeEl.className = 'stage-time active'; timeEl.textContent = '...'; }
+    if (state === 'success') { icon.textContent = '✓'; timeEl.textContent = time || ''; }
+    if (state === 'pending') { icon.textContent = '—'; }
+  }
+
+  async function startDemo() {
+    if (demoRunning) return;
+    demoRunning = true;
+    document.getElementById('btnRun').disabled = true;
+
+    const tb = document.getElementById('termBody');
+    // Clear and start
+    tb.innerHTML = '<span class="cursor"></span>';
+    setPhase(0);
+
+    // PHASE 0: Setup check
+    await typeLines(lines.setup, tb);
+    setPhase(1);
+
+    // PHASE 1: Commit
+    await typeLines(lines.commit, tb);
+    document.getElementById('commitInfo').style.display = 'block';
+    document.getElementById('commitSha').textContent = 'abc1234';
+    setPhase(2);
+
+    // PHASE 2: test stages
+    setStage('lint', 'running');
+    await typeLines([lines.pipeline[0]], tb);
+    await delay(200);
+    await typeLines(lines.pipeline.slice(1, 7), tb);
+    setStage('lint', 'success', '15s');
+
+    setStage('test', 'running');
+    await typeLines(lines.pipeline.slice(7, 11), tb);
+    setStage('test', 'success', '30s');
+
+    setStage('sec', 'running');
+    await typeLines(lines.pipeline.slice(11), tb);
+    setStage('sec', 'success', '20s');
+
+    // PHASE 3: build
+    setPhase(3);
+    setStage('build', 'running');
+    setStage('push', 'running');
+    await typeLines(lines.build, tb);
+    setStage('build', 'success', '2m 10s');
+    setStage('push', 'success', '25s');
+
+    // Add new registry tag
+    const grid = document.getElementById('regGrid');
+    const newTag = document.createElement('div');
+    newTag.className = 'reg-tag new';
+    newTag.textContent = 'abc1234 ★';
+    grid.insertBefore(newTag, grid.firstChild);
+    // remove last
+    if (grid.children.length > 9) grid.removeChild(grid.lastChild);
+
+    // PHASE 4: deploy
+    setPhase(4);
+    setStage('deploy', 'running');
+    await typeLines(lines.deploy, tb);
+    setStage('deploy', 'success', '52s');
+
+    // Update stats
+    document.getElementById('stat-deploys').textContent = '31';
+    document.getElementById('stat-time').textContent = '4m 02s';
+
+    demoRunning = false;
+    document.getElementById('btnRun').disabled = false;
+    document.getElementById('btnRun').textContent = '▶ Run Again';
+  }
+
+  function resetDemo() {
+    demoRunning = false;
+    document.getElementById('btnRun').disabled = false;
+    document.getElementById('btnRun').textContent = '▶ Run Demo';
+    document.getElementById('commitInfo').style.display = 'none';
+    document.getElementById('stat-deploys').textContent = '0';
+    document.getElementById('stat-time').textContent = '—';
+    setPhase(0);
+    ['lint','test','sec','build','push','deploy'].forEach(s => setStage(s,'pending'));
+
+    const tb = document.getElementById('termBody');
+    tb.innerHTML = `
+      <span class="line output"># AI Infrastructure Meetup Demo</span>
+      <span class="line output"># Click "Run Demo" to start the live pipeline walkthrough</span>
+      <span class="line blank"></span>
+      <span class="line output">System: Ubuntu 22.04 LTS on Proxmox VM</span>
+      <span class="line output">Hardware: 16GB RAM, 8 cores, 100GB NVMe</span>
+      <span class="line blank"></span>
+      <span class="line success">✓ GitLab CE: running (port 80)</span>
+      <span class="line success">✓ GitLab Runner: online (docker executor)</span>
+      <span class="line success">✓ Container Registry: ready (port 5050)</span>
+      <span class="line blank"></span>
+      <span class="line output">Project: <span style="color:#fff">ai-list-assist</span> — FastAPI + Gemini</span>
+      <span class="line output">Purpose: product photos → eBay listings via multimodal AI</span>
+      <span class="line blank"></span>
+      <span class="cursor"></span>
+    `;
+
+    // Reset registry
+    document.getElementById('regGrid').innerHTML = `
+      <div class="reg-tag">a1b2c3d</div>
+      <div class="reg-tag">e4f5a6b</div>
+      <div class="reg-tag">c7d8e9f</div>
+      <div class="reg-tag">b2c3d4e</div>
+      <div class="reg-tag">f5a6b7c</div>
+      <div class="reg-tag">d8e9f0a</div>
+      <div class="reg-tag">1b2c3d4</div>
+      <div class="reg-tag">e5f6a7b</div>
+      <div class="reg-tag" style="color:var(--muted);font-style:italic">+7 more</div>
+    `;
+  }
+
+  function jumpPhase(n) {
+    // just a visual indicator click — don't interrupt running demo
+    if (!demoRunning) setPhase(n);
+  }
+</script>
+
+</body>
+</html>
