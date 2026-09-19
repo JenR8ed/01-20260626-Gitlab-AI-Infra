@@ -802,6 +802,12 @@
   };
 
   async function typeLines(lineArr, termBody) {
+    let cur = termBody.querySelector('.cursor');
+    if (!cur) {
+      cur = document.createElement('span');
+      cur.className = 'cursor';
+      termBody.appendChild(cur);
+    }
     for (const l of lineArr) {
       const span = document.createElement('span');
       if (l.t === 'blank') {
@@ -811,13 +817,8 @@
         span.textContent = l.txt;
         if (l.t === 'prompt') span.classList.add('prompt');
       }
-      // remove cursor, add line, re-add cursor
-      const cur = termBody.querySelector('.cursor');
-      if (cur) cur.remove();
-      termBody.appendChild(span);
-      const newCur = document.createElement('span');
-      newCur.className = 'cursor';
-      termBody.appendChild(newCur);
+
+      termBody.insertBefore(span, cur);
       termBody.scrollTop = termBody.scrollHeight;
       await delay(l.t === 'blank' ? 80 : l.t === 'prompt' ? 300 : 150);
     }
